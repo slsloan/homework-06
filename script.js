@@ -1,6 +1,12 @@
+var citySearch;
+var searchHistoryArr = [];
+
 $(document).ready(function () {
 
     $("#five-day-forecast-container").hide();
+    displayHistory();
+    clearHistory();
+    clickHistory()
 
     function search(cityname) {
         var APIKey = "3dfabf2b0565a466054d6a68c0f34740";
@@ -11,8 +17,11 @@ $(document).ready(function () {
             method: "GET"
         }).then(function (response) {
             var currentDate = new Date();
+            var name = response.name;
             $("#city-name").text(response.name + " (" + currentDate.toLocaleDateString('en-US') + ") ");
             $("#current-pic").attr("src", "https://openweathermap.org/img/w/" + response.weather[0].icon + ".png");
+
+            storeHistory(name);
 
             var tempKelvin = response.main.temp
             var cityTemp = (((tempKelvin - 273.15) * 9) / 5 + 32).toFixed(2);
@@ -102,12 +111,7 @@ $(document).ready(function () {
     // Search button function for when it's clicked
     $("#search-button").on("click", function () {
         var cityName = $("#city-input").val().trim();
-        var addCity = ("<li id='city-results' type='button' class='list-group-item'>" + cityName + "</li>");
-
         search(cityName);
-
-        // Append the cities to the list on the page
-        $("#search-results").append(addCity);
 
         // Clear results after searching
         $("#city-input").val("");
@@ -121,10 +125,79 @@ $(document).ready(function () {
         }
     });
 
+    function storeHistory(citySearchName) {
+        var searchHistoryObj = {};
 
-    // Clear the local storage history
-    // $("#clear-history").on("click", function () {
-    // localStorage.clear();
-    // location.reload();
-    // });
+        if (searchHistoryArr.length === 0) {
+            searchHistoryObj["city"] = citySearchName;
+            searchHistoryArr.push(searchHistoryObj);
+            localStorage.setItem("searchHistory", JSON.stringify(searchHistoryArr));
+        } else {
+            var checkHistory = searchHistoryArr.find(
+                ({ city }) => city === citySearchName
+            );
+
+            if (searchHistoryArr.length < 5) {
+                if (checkHistory === undefined) {
+                    searchHistoryObj["city"] = citySearchName;
+                    searchHistoryArr.push(searchHistoryObj);
+                    localStorage.setItem(
+                        "searchHistory",
+                        JSON.stringify(searchHistoryArr)
+                    );
+                }
+            } else {
+                if (checkHistory === undefined) {
+                    searchHistoryArr.shift();
+                    searchHistoryObj["city"] = citySearchName;
+                    searchHistoryArr.push(searchHistoryObj);
+                    localStorage.setItem(
+                        "searchHistory",
+                        JSON.stringify(searchHistoryArr)
+                    );
+                }
+            }
+        }
+        $("#history").empty();
+        displayHistory();
+    }
+
+    function displayHistory() {
+        var getLocalSearchHistory = localStorage.getItem("searchHistory");
+        var localSearchHistory = JSON.parse(getLocalSearchHistory);
+
+        if (getLocalSearchHistory === null) {
+            createHistory();
+            getLocalSearchHistory = localStorage.getItem("searchHistory");
+            localSearchHistory = JSON.parse(getLocalSearchHistory);
+        }
+
+        for (var i = 0; i < localSearchHistory.length; i++) {
+            var historyLi = $("<li>");
+            historyLi.addClass("list-group-item");
+            historyLi.text(localSearchHistory[i].city);
+            $("#history").prepend(historyLi);
+        }
+        return (searchHistoryArr = localSearchHistory);
+    }
+
+    function createHistory() {
+        searchHistoryArr.length = 0;
+        localStorage.setItem("searchHistory", JSON.stringify(searchHistoryArr));
+    }
+
+    function clearHistory() {
+        $("#clear-history").on("click", function () {
+            $("#history").empty();
+            localStorage.removeItem("searchHistory");
+            createHistory();
+        });
+    }
+
+    function clickHistory() {
+        $("#history").on('click', 'li', function () {
+            var cityNameHistory = $(this).text();
+            search(cityNameHistory);
+        });
+    }
 });
